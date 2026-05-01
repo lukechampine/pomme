@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pomme</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><span class="emoji-swap"><span class="apple">🍎</span><span class="potato">🥔</span></span> Pomme</a>
+</header>
+
+<main>
+
+<!-- Shared inline progress block. Moved into the active view's progress slot
+     by JS for the duration of an upload / sign / pass operation. -->
+<div id="inline-progress" hidden>
+  <h3 id="progress-title" class="progress-title">Working…</h3>
+  <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+  <p id="progress-stages">Initializing…</p>
+  <p><a id="approval-link" href="#" hidden></a></p>
+</div>
+
+<!-- Home / originator -->
+<section id="view-home" class="view">
+  <h1><span class="emoji-swap"><span class="apple">🍎</span><span class="potato">🥔</span></span> Pomme</h1>
+  <p class="lede">A relay drawing game that lives on Sia decentralized storage.</p>
+  <p>Start a chain by baking a hot potato, uploading it to your own Sia account, and sending the pass link to a friend. They have <strong>24 hours</strong> to pass it on or the chain dies. After <strong>5 hops</strong> the potato cools and everyone wins.</p>
+  <label class="field">
+    <span class="field-label">Your name</span>
+    <input id="home-name" type="text" maxlength="32" autocomplete="off">
+    <p id="home-name-err" class="error-msg" hidden>Please enter your name.</p>
+  </label>
+  <button id="start-btn" class="big-btn">🥔 Start a chain</button>
+  <p class="fineprint">Requires a free <a href="https://sia.storage" target="_blank">sia.storage</a> account.</p>
+  <div id="home-progress-slot" class="progress-slot"></div>
+
+  <div id="home-chains-section" hidden>
+    <h2>Your potatoes</h2>
+    <ul id="home-chains-list" class="chains-list"></ul>
+  </div>
+</section>
+
+<!-- Recipient: gift box, pre-signin (no info revealed!) -->
+<section id="view-gift" class="view" hidden>
+  <div class="gift-svg" aria-label="gift box silhouette">
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <rect x="30" y="80" width="140" height="100" fill="#000"/>
+      <rect x="30" y="60" width="140" height="25" fill="#000"/>
+      <rect x="92" y="60" width="16" height="120" fill="#3a1f04"/>
+      <path d="M100 60 C 75 30, 50 30, 50 50 C 50 60, 75 60, 100 60 Z" fill="#000"/>
+      <path d="M100 60 C 125 30, 150 30, 150 50 C 150 60, 125 60, 100 60 Z" fill="#000"/>
+    </svg>
+  </div>
+  <h2>Someone sent you a gift.</h2>
+  <label class="field">
+    <span class="field-label">Sign here to receive your gift</span>
+    <input id="gift-name" type="text" maxlength="32" placeholder="Your name" autocomplete="off">
+    <p id="gift-name-err" class="error-msg" hidden>Please enter your name.</p>
+  </label>
+  <button id="gift-accept" class="big-btn">✍️ Sign &amp; receive</button>
+  <div id="gift-progress-slot" class="progress-slot"></div>
+  <p class="fineprint">Sign in with <a href="https://sia.storage" target="_blank">sia.storage</a>.</p>
+</section>
+
+<!-- After signing: gift box (download) -> reveal animation -> draw + pass -->
+<section id="view-holding" class="view" hidden>
+  <!-- Stage 1: still wrapped, downloading from Sia. -->
+  <div id="holding-stage-download">
+    <div class="gift-svg" aria-label="gift box silhouette">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <rect x="30" y="80" width="140" height="100" fill="#000"/>
+        <rect x="30" y="60" width="140" height="25" fill="#000"/>
+        <rect x="92" y="60" width="16" height="120" fill="#3a1f04"/>
+        <path d="M100 60 C 75 30, 50 30, 50 50 C 50 60, 75 60, 100 60 Z" fill="#000"/>
+        <path d="M100 60 C 125 30, 150 30, 150 50 C 150 60, 125 60, 100 60 Z" fill="#000"/>
+      </svg>
+    </div>
+    <div class="progress-track"><div class="progress-bar indeterminate"></div></div>
+    <p id="holding-img-status">Unwrapping your gift…</p>
+  </div>
+
+  <!-- Stage 2: canvas + reveal text overlay. -->
+  <div id="holding-stage-canvas" class="reveal-stage" hidden>
+    <canvas id="holding-canvas" class="potato-canvas" width="512" height="512"></canvas>
+    <div id="reveal-top" class="reveal-overlay reveal-overlay-top">
+      <div class="reveal-line">
+        <span class="reveal-word" data-step="1">You</span> <span class="reveal-word" data-step="2">just</span> <span class="reveal-word" data-step="3">got</span>
+      </div>
+      <div class="reveal-line reveal-line-big" data-step="4">HOT POTATO&apos;D</div>
+    </div>
+    <div id="reveal-bottom" class="reveal-overlay reveal-overlay-bottom" hidden>Someone dropped a hot potato in your lap! Don&apos;t get burned — pass it on to another gullible sap within 24 hours.</div>
+  </div>
+
+  <!-- Stage 3: drawing controls + pass button (fade in 3s after the reveal). -->
+  <div id="holding-stage-tools" hidden>
+    <div id="holding-tools" class="draw-tools">
+      <div class="tools-row">
+        <span class="tool-label">color:</span>
+        <button class="color-swatch active" data-color="#000000" style="background:#000000" aria-label="black"></button>
+        <button class="color-swatch" data-color="#ffffff" style="background:#ffffff" aria-label="white"></button>
+        <button class="color-swatch" data-color="#ff5b3a" style="background:#ff5b3a" aria-label="red"></button>
+        <button class="color-swatch" data-color="#ffae3a" style="background:#ffae3a" aria-label="orange"></button>
+        <button class="color-swatch" data-color="#6cd47a" style="background:#6cd47a" aria-label="green"></button>
+        <button class="color-swatch" data-color="#3a8aff" style="background:#3a8aff" aria-label="blue"></button>
+        <span class="tool-spacer"></span>
+        <span class="tool-label">brush:</span>
+        <button class="brush-size" data-size="2" aria-label="thin">·</button>
+        <button class="brush-size active" data-size="5" aria-label="medium">●</button>
+        <button class="brush-size" data-size="12" aria-label="thick">⬤</button>
+        <span class="tool-spacer"></span>
+        <button id="canvas-undo" class="tool-btn">undo</button>
+      </div>
+    </div>
+
+    <p class="countdown" id="holding-countdown"></p>
+
+    <button id="holding-pass-btn" class="big-btn">🔥 Pass it on</button>
+    <div id="holding-progress-slot" class="progress-slot"></div>
+  </div>
+</section>
+
+<!-- History modal: enlarged view of a prior potato -->
+<div id="history-modal" class="modal" hidden>
+  <div class="modal-backdrop"></div>
+  <div class="modal-content">
+    <button id="history-modal-close" class="modal-close" aria-label="close">×</button>
+    <h3 id="history-modal-title"></h3>
+    <img id="history-modal-img" class="potato-img">
+  </div>
+</div>
+
+<!-- After pass: the next link -->
+<section id="view-passed" class="view" hidden>
+  <h2 id="passed-title">🥔 Potato Baked.</h2>
+  <p id="passed-line">Keep the chain alive by sending someone else this link. But choose your victim carefully: <strong>if more than one person uses your link, the chain dies.</strong> (In other words: don&apos;t post your link publicly in the hopes of getting a bite!)</p>
+  <img id="passed-img" class="potato-img" alt="potato">
+  <div id="passed-link-row" class="link-row">
+    <input id="passed-url" type="text" readonly>
+    <button id="passed-copy" class="big-btn">Copy link</button>
+  </div>
+  <p class="countdown" id="passed-countdown"></p>
+  <div id="passed-watch" class="banner banner-alive">⏳ Watching for someone to accept your link…</div>
+</section>
+
+<!-- Already claimed (someone beat us to it) -->
+<section id="view-toolate" class="view" hidden>
+  <h2>💨 too slow.</h2>
+  <p>This potato was already grabbed by <strong id="toolate-holder"></strong>. The chain has moved on.</p>
+  <p><a id="toolate-chain-link" href="#">See the chain →</a></p>
+</section>
+
+<!-- Chain killed -->
+<section id="view-killed" class="view" hidden>
+  <h2>💀 the chain died.</h2>
+  <p><strong id="killed-killer"></strong> <span id="killed-reason"></span>.</p>
+  <p>This potato is no longer passable.</p>
+  <p><a id="killed-chain-link" href="#">See the chain →</a></p>
+</section>
+
+<!-- Loading state -->
+<section id="view-loading" class="view" hidden>
+  <p id="loading-text">Loading…</p>
+  <div class="progress-track"><div class="progress-bar indeterminate"></div></div>
+</section>
+
+<!-- Error fallback -->
+<section id="view-error" class="view" hidden>
+  <h2>Something went wrong.</h2>
+  <p id="error-text"></p>
+  <p><a href="/">← back to start</a></p>
+</section>
+
+<!-- Shared chain-status block: rendered alongside the user's potato view
+     (passed or holding). Always after the active <section.view>. -->
+<aside id="chain-status-section" class="chain-status-section" hidden>
+  <h3 class="chain-status-header">the chain</h3>
+  <ol id="chain-status-list" class="chain-list"></ol>
+</aside>
+
+</main>
+
+<footer>
+  <small>app id <code>821b…6d08</code> · indexer <a href="https://sia.storage">sia.storage</a> · requires Firefox or Chrome (WebTransport)</small>
+</footer>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
